@@ -1,0 +1,358 @@
+---
+title: "Practicum 1"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+---
+Author: Congkai Sun;  sun.con@northeastern.edu
+        YiHsin Wen;  wen.yih@northeastern.edu
+---
+```{r}
+library(RMySQL)
+
+db_user <- 'root'
+db_password <- 'tobenmlgb'
+db_name <- 'cs5200dbsun'
+db_host <- 'localhost'
+db_port <- 3306
+
+mydb <- dbConnect(MySQL(), user = db_user, password = db_password, dbname = db_name, host = db_host, port = db_port)
+```
+
+```{r}
+library(tidyverse)
+```
+```{r}
+library('plyr')
+```
+```{r}
+library(ggplot2)
+```
+
+Problem 1
+```{sql connection=mydb}
+DROP TABLE IF EXISTS incidents
+```
+
+```{sql connection=mydb}
+CREATE TABLE incidents(
+  iid INTEGER PRIMARY KEY AUTO_INCREMENT,
+  incidentDate DATE DEFAULT '0000-00-00',
+  origin NUMERIC,
+  airline VARCHAR(35) DEFAULT 'unknown',
+  aircraft VARCHAR(35),
+  flightPhase VARCHAR(35) DEFAULT 'unknown',
+  impact VARCHAR(35),
+  cond NUMERIC,
+  FOREIGN KEY(cond) REFERENCES conditions(cid),
+  FOREIGN KEY(origin) REFERENCES states(recordID)
+);
+```
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS states
+```
+
+```{sql connection=mydb}
+CREATE TABLE states(
+  recordID NUMERIC,
+  PRIMARY KEY(recordID),
+  FOREIGN KEY(recordID) REFERENCES airports(aid)
+)
+```
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS airports
+```
+
+```{sql connection=mydb}
+CREATE TABLE airports(
+  aid NUMERIC,
+  state VARCHAR(35),
+  airportName VARCHAR(35) DEFAULT 'unknown',
+  airportCode CHAR(3),
+  PRIMARY KEY(aid)
+)
+```
+
+```{sql connection=mydb}
+DROP TABLE IF EXISTS conditions
+```
+
+```{sql connection=mydb}
+CREATE TABLE conditions(
+  cid NUMERIC,
+  cond VARCHAR(35),
+  explanation TEXT,
+  PRIMARY KEY(cid)
+)
+```
+
+Replace climb with takeoff
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Climb','takeoff')
+```
+
+Replace take-off run with takeoff
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Take-off run','takeoff')
+```
+
+Replace landing roll with landing 
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Landing Roll','landing')
+```
+
+Replace decent with inflight
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Descent','inflight')
+```
+
+Replace taxi with takeoff
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Taxi','takeoff')
+```
+
+Replace approach with inflight
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Approach','inflight')
+```
+
+Replace parked with landing 
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase=REPLACE(flightPhase,'Parked','landing')
+```
+
+Remove all military flights from the database
+```{sql connection=mydb}
+DELETE incidents, states, airports, conditions
+FROM incidents
+INNER JOIN states
+INNER JOIN airports
+INNER JOIN conditions
+ON incidents.origin = states.recordID AND states.recordID = airports.aid AND incidents.cond = conditions.cid
+WHERE airline = 'MILITARY'
+```
+
+Replace empty string with unknown
+```{sql connection=mydb}
+UPDATE incidents 
+SET flightPhase= 'unknown' WHERE flightPhase IS NULL or flightPhase = '';
+```
+
+Replace empty string with unknown
+```{sql connection=mydb}
+UPDATE incidents 
+SET airline= 'unknown' WHERE airline IS NULL or airline = '';
+```
+
+Replace impact value
+```{sql connection=mydb}
+UPDATE incidents 
+SET impact = REPLACE(impact,'Caused damage','TRUE')
+```
+
+```{sql connection=mydb}
+UPDATE incidents 
+SET impact = REPLACE(impact,'No damage','FALSE')
+```
+
+```{sql connection=mydb}
+SELECT * FROM incidents
+```
+
+```{sql connection=mydb}
+SELECT * FROM airports
+```
+
+```{sql connection=mydb}
+SELECT * FROM conditions
+```
+
+Problem 2
+Read CSV file
+```{r}
+path <- "D:/Spring 2022/CS 5200/P1"
+fn <- "BirdStrikesData.csv"
+
+fileName <- paste(path, fn, sep = "/")
+
+bevDF <- read.csv(fileName, header = TRUE, stringsAsFactors = FALSE)
+```
+
+Import the values of states table
+```{r}
+recordID <- bevDF$ï..Record.ID
+
+dfstate <- data.frame(recordID)
+```
+
+```{r}
+dbWriteTable(conn = mydb, "states", value = dfstate, append = TRUE, row.names = FALSE)
+```
+
+Import the values of airports table 
+```{r}
+aid <- bevDF$ï..Record.ID
+state <- bevDF$Origin.State
+airportName <-bevDF$Airport..Name
+
+length(state) <- length(aid)
+length(airportName) <- length(aid)
+
+dfAir <- data.frame(aid, state, airportName)
+```
+
+```{r}
+dbWriteTable(conn = mydb, "airports", value = dfAir, append = TRUE, row.names = FALSE)
+```
+
+Import the values of conditions table 
+```{r}
+cid <- bevDF$ï..Record.ID
+cond <- bevDF$Conditions..Sky
+
+length(cond) <- length(cid)
+dfcon <- data.frame(cid, cond)
+```
+
+```{r}
+dbWriteTable(conn = mydb, "conditions", value = dfcon, append = TRUE, row.names = FALSE)
+```
+
+Import the values of incidents table 
+```{r}
+incidentDate <-bevDF$FlightDate
+origin <- bevDF$ï..Record.ID
+airline <- bevDF$Aircraft..Airline.Operator
+aircraft <- bevDF$Aircraft..Make.Model
+flightPhase <- bevDF$When..Phase.of.flight
+impact <- bevDF$Effect..Indicated.Damage
+cond <- bevDF$ï..Record.ID
+
+length(incidentDate) <- length(cond)
+length(origin) <- length(cond)
+length(airline) <- length(cond)
+length(aircraft) <- length(cond)
+length(flightPhase) <- length(cond)
+length(impact) <- length(cond)
+
+dfInc <- data.frame(incidentDate, origin, airline, aircraft, flightPhase, impact, cond)
+```
+
+Keep the mm/dd/yy of incident date
+```{r}
+df <- dfInc %>%
+  mutate(incidentDate = str_remove_all(incidentDate, "0:00"))
+```
+
+```{r}
+df$incidentDate <- as.Date(df$incidentDate, format = "%m/%d/%Y")
+```
+
+```{r}
+dbWriteTable(conn = mydb, "incidents", value = df, append = TRUE, row.names = FALSE)
+```
+
+Problem 3
+Display the parts of each table to consider about the impact of different conditions on bird strikes incidents and see which airports are prone to incidents under which specific conditions
+```{sql connection=mydb}
+DROP VIEW condition_factor
+```
+
+```{sql connection=mydb}
+CREATE VIEW condition_factor AS
+SELECT incidents.iid, incidents.incidentDate, incidents.impact, airports.airportName, conditions.cond
+FROM incidents, airports, conditions
+WHERE incidents.origin = airports.aid AND incidents.cond = conditions.cid
+GROUP BY incidents.iid
+```
+
+```{sql connection=mydb}
+SELECT * FROM condition_factor
+```
+
+Problem 4
+```{sql connection=mydb}
+SELECT flightPhase, COUNT(*) AS incidentsNumber
+FROM incidents
+Group BY flightPhase
+```
+
+Problem 5
+```{sql connection=mydb}
+SELECT flightPhase, COUNT(iid) AS incidentsNumber FROM incidents
+GROUP BY flightPhase
+HAVING COUNT(iid) >= (SELECT AVG(incident_count) FROM
+            (SELECT COUNT(iid) as incident_count, flightPhase
+             FROM incidents
+             GROUP BY flightPhase)a);
+```
+
+Problem 6
+Average number of bird strike incidents by month (across all years)
+```{sql connection=mydb}
+SELECT  MONTH(incidentDate) as month, ROUND(count(incidentDate)/12,0) AS count
+       FROM incidents
+       GROUP BY month
+       ORDER BY month
+```
+
+
+Problem 7
+Extract the incident's dates
+```{r}
+dates <- as.Date(df$incidentDate, "%m/%d/%Y")
+```
+
+```{r}
+dates <- as.POSIXct(dates, format = "%m/%d/%Y")
+```
+
+Extract the incident's years
+```{r}
+years <- format(dates, format="%Y")
+```
+
+```{r}
+year <- as.data.frame(years)
+```
+
+Count the frequency of incidents for each years
+```{r}
+incident_freq <- count(year)
+```
+
+Extract the frequency of incidents from 2005 to 2011
+```{r}
+target_freq <- incident_freq[6:12,]
+```
+
+```{r}
+ggplot(data = target_freq, aes(x = years, y= freq)) + geom_bar(position = 'dodge', stat = 'identity') + ggtitle("The Number of Incidents from 2005 to 2011")
+```
+
+Problem 8
+Stored procedure for insert airport name, aid, and state value 
+```{sql connection=mydb}
+CREATE DEFINER=`root`@`localhost` PROCEDURE `INSERTINCIDENTS`(IN airportName VARCHAR(35),
+IN state VARCHAR(35),
+IN aid NUMERIC)
+BEGIN
+
+INSERT INTO airports (airportName, aid, state)
+VALUES (@airportName, @aid,  @state);
+
+END
+```
+
