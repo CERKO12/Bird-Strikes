@@ -1,5 +1,5 @@
 ---
-title: "Practicum 1"
+title: "BirdStrikes"
 output:
   html_document:
     df_print: paged
@@ -7,8 +7,6 @@ output:
   pdf_document: default
 ---
 ---
-Author: Congkai Sun;  sun.con@northeastern.edu
-        YiHsin Wen;  wen.yih@northeastern.edu
 ---
 ```{r}
 library(RMySQL)
