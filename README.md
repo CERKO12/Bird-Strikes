@@ -1,1 +1,2 @@
 # Bird-Strikes
+The created database based on the designed entity relationship diagram about the incident of wildlife incidents (bird strikes on aircraft), then imported the wildlife incidents that occurred in the United States between 2001 and 2011 into database, and summarized the number of wildlife incidents in each month based on the possible factors such as weather, time of the day, flight phase, etc.
